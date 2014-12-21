@@ -1,0 +1,105 @@
+----
+title: "README.Rmd"
+author: "Maria Velasco"
+date: "20 Dec 2014"
+output: html_document
+---
+
+Reproducing Qualitative Activity Recognition of Weight Lifting Exercises
+---------------------------------------------------------------
+Maria Velasco, Dec 21 2014
+
+Notes
+-----
+This document includes the Practical Machine Learning - Coursera Class Dec 2014 Project by mvelasco, published in https://github.com/mvelascoc/MachLearning
+
+Exploratory data analysis done to complete this project included in the exploratory.md file. 
+
+Summary
+-------
+
+Movement data is collected [1] performing a set of repetitions on  Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+The purpose of this project is to define model that can predict, based on the movement data, if the movement was done correctly.
+From a set of 160 variables, a subset of 12 was selected. Using caret package Gradient Boosted Machine algorithm a model was built with an acuracy of 0.45.
+
+Data Analysis
+-------------
+To define the features to be included in the algorith, several exploratory analysis were made. Deciding on using the most important features on a linear approach, the selected variables to be included were 
+
+Variable name        | Overall importance
+---------------------|-------------------
+magnet_dumbbell_z    |   65.68
+accel_forearm_z      |   48.09
+magnet_dumbbell_x    |   34.25
+pitch_forearm        |   24.92
+yaw_dumbbell         |   24.31
+magnet_belt_y        |   23.94
+total_accel_forearm  |   22.91
+accel_arm_z          |   22.83
+accel_belt_y         |   22.20
+pitch_belt           |   19.79
+accel_dumbbell_x     |   18.15
+total_accel_dumbbell |   17.88
+
+```{r echo=FALSE}
+library(caret)
+seed(897)
+traindata <- read.csv("pml-training.csv")
+numericdata <- subset(traindata, select=c("roll_belt","pitch_belt", "yaw_belt", "total_accel_belt", "gyros_belt_x", "gyros_belt_y", "gyros_belt_z", "accel_belt_x", "accel_belt_y", "accel_belt_z", "magnet_belt_x", "magnet_belt_y", "magnet_belt_z", "roll_arm", "pitch_arm", "yaw_arm", "total_accel_arm", "gyros_arm_x", "gyros_arm_y", "gyros_arm_z", "accel_arm_x", "accel_arm_y", "accel_arm_z", "magnet_arm_x", "magnet_arm_y", "magnet_arm_z", "roll_dumbbell", "pitch_dumbbell", "yaw_dumbbell", "total_accel_dumbbell", "gyros_dumbbell_x", "gyros_dumbbell_y", "gyros_dumbbell_z", "accel_dumbbell_x", "accel_dumbbell_y", "accel_dumbbell_z", "magnet_dumbbell_x", "magnet_dumbbell_y", "magnet_dumbbell_z", "roll_forearm", "pitch_forearm", "yaw_forearm", "total_accel_forearm", "gyros_forearm_x", "gyros_forearm_y", "gyros_forearm_z", "accel_forearm_x", "accel_forearm_y", "accel_forearm_z", "magnet_forearm_x", "magnet_forearm_y", "magnet_forearm_z"))
+
+target <- subset(traindata, select=c("X", "classe"))
+
+modFit <- train(as.numeric(target$classe) ~ ., method="lm", data=numericdata)
+
+importance <- varImp(modFit, scale=FALSE)
+# plot importance
+plot(importance)
+```
+
+Model Selection
+---------------
+
+Multiple models were proved using the caret package. Accuracy on the predictions using the training set were recorded, selecting the Gradient Boosted Machine gbm as the best one.
+Reported accuracies [1] using random forest model could not be reproduced.
+
+Type of Model | Accuracy
+--------------|------
+  lm          |  0.297   
+  nnet        |  0.1744
+  gbm         |  0.482 
+  
+Model Testing
+-------------
+
+Using the testing set of data, the confusion matrix is created. 
+The model created does not have the accuracy of the one in the paper, but does have a significant prediction result, considered enough for this homwork project.
+
+
+```{r echo=FALSE}
+finaldata <- subset(traindata, select=c("classe", "magnet_dumbbell_z", "accel_forearm_z","magnet_dumbbell_x","pitch_forearm","yaw_dumbbell","magnet_belt_y","total_accel_forearm","accel_arm_z","accel_belt_y","pitch_belt","accel_dumbbell_x","total_accel_dumbbell"))
+
+inTrain <- createDataPartition(y=finaldata$classe, p=0.75, list=FALSE)
+training <- finaldata[inTrain,]
+testing <- finaldata[-inTrain,]
+
+modFitOp3 <- train(as.numeric(classe) ~ ., method="gbm", data=training, verbose = FALSE)
+
+predicted3 <- predict(modFitOp3, testing)
+divide3 = cut(predicted3,5)
+levels(divide3)[1] <- "A"
+levels(divide3)[2] <- "B"
+levels(divide3)[3] <- "C"
+levels(divide3)[4] <- "D"
+levels(divide3)[5] <- "E"
+
+confusionMat3 <- confusionMatrix(divide3, testing$classe)
+confusionMat3
+```
+
+References
+----------
+[1] Data for this project comes from http://groupware.les.inf.puc-rio.br/har. 
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+

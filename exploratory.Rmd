@@ -97,10 +97,6 @@ modFitOp2
 modFitOp3 <- train(as.numeric(classe) ~ ., method="gbm", data=training)
 modFitOp3
 
-plot(testing$classe, pred1)
-plot(testing$classe, pred2)
-plot(testing$classe, pred3)
-
 predicted1 <- predict(modFitOp1, training)
 divide1 = cut(predicted1,5)
 levels(divide1)[1] <- "A"
