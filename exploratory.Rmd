@@ -1,0 +1,136 @@
+---
+title: ???exploratory.md"
+author: "Maria Velasco"
+date: "20 Dec 2014"
+output: html_document
+---
+**Data Analysis for Reproducing Qualitative Activity Recognition of Weight Lifting Exercises**
+Maria Velasco, Dec 21 2014
+
+Note
+This document includes the exploratory data analysisi done for the Practical Machine Learning - Coursera Class Dec 2014 Project by mvelasco, published in https://github.com/mvelascoc/MachLearning
+
+References
+Data for this project comes from http://groupware.les.inf.puc-rio.br/har. 
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+*Reviewing the data*
+Data for the project includes 160 variables. In order to review them and find the significant ones, the following summaries and graphics were useful.
+```{r}
+seed(897)
+traindata <- read.csv("pml-training.csv")
+testdata <- read.csv("pml-testing.csv")
+
+#reviewing types of data and selecting initial set of numeric and significant variables
+summary(traindata)
+
+numericdata <- subset(traindata, select=c("roll_belt","pitch_belt", "yaw_belt", "total_accel_belt", "gyros_belt_x", "gyros_belt_y", "gyros_belt_z", "accel_belt_x", "accel_belt_y", "accel_belt_z", "magnet_belt_x", "magnet_belt_y", "magnet_belt_z", "roll_arm", "pitch_arm", "yaw_arm", "total_accel_arm", "gyros_arm_x", "gyros_arm_y", "gyros_arm_z", "accel_arm_x", "accel_arm_y", "accel_arm_z", "magnet_arm_x", "magnet_arm_y", "magnet_arm_z", "roll_dumbbell", "pitch_dumbbell", "yaw_dumbbell", "total_accel_dumbbell", "gyros_dumbbell_x", "gyros_dumbbell_y", "gyros_dumbbell_z", "accel_dumbbell_x", "accel_dumbbell_y", "accel_dumbbell_z", "magnet_dumbbell_x", "magnet_dumbbell_y", "magnet_dumbbell_z", "roll_forearm", "pitch_forearm", "yaw_forearm", "total_accel_forearm", "gyros_forearm_x", "gyros_forearm_y", "gyros_forearm_z", "accel_forearm_x", "accel_forearm_y", "accel_forearm_z", "magnet_forearm_x", "magnet_forearm_y", "magnet_forearm_z"))
+
+target <- subset(traindata, select=c("X", "classe"))
+
+# checking if some data are similar... some variables can be eliminated. In particular
+# total_accel_belt accel_belt_y gyros_dumbbell_z
+M <- cor(numericdata)
+diag(M) <- 0
+which(M > 0.9, arr.ind=T)
+
+# Checking or principal components, the approach does not seem useful for this project
+prComp <- prcomp(numericdata)
+plot(prComp$x[,1],prComp$x[,2], col=traindata$classe, xlab="PC1", ylab="PC2")
+plot(prComp$x[,1], traindata$classe, xlab="PC1", ylab="Classe")
+plot(prComp$x[,2], traindata$classe, xlab="PC2", ylab="Classe")
+plot(prComp$x[,3], traindata$classe, xlab="PC3", ylab="Classe")
+
+#Still have too maney features, so
+fit <- lm(as.numeric(target$classe) ~ ., data=numericdata)
+summary(fit)
+#check some to eliminate
+
+numericdata2 <- subset(traindata, select=c("roll_belt","pitch_belt", "yaw_belt",  "gyros_belt_x",  "accel_belt_x",   "magnet_belt_x", "magnet_belt_y", "magnet_belt_z",  "pitch_arm", "yaw_arm", "total_accel_arm", "gyros_arm_x", "gyros_arm_y", "gyros_arm_z",  "accel_arm_y", "accel_arm_z", "magnet_arm_x", "magnet_arm_y", "magnet_arm_z", "roll_dumbbell", "pitch_dumbbell", "yaw_dumbbell", "total_accel_dumbbell", "gyros_dumbbell_x", "gyros_dumbbell_y", "accel_dumbbell_x", "accel_dumbbell_z", "magnet_dumbbell_x", "magnet_dumbbell_y", "magnet_dumbbell_z", "roll_forearm", "pitch_forearm", "yaw_forearm", "total_accel_forearm", "gyros_forearm_x",  "accel_forearm_x", "accel_forearm_y", "accel_forearm_z", "magnet_forearm_x", "magnet_forearm_y", "magnet_forearm_z"))
+
+fit2 <- lm(as.numeric(target$classe) ~ ., data=numericdata2)
+summary(fit2)
+#and verify there is no significant loss
+#still to many features, but a model can be made
+
+#caret
+library(caret)
+modFit <- train(as.numeric(target$classe) ~ ., method="lm", data=numericdata2)
+modFit
+
+pred <- predict(modFit, numericdata2)
+plot(target$classe, pred)
+
+# back to finding correct features (40 is too many)
+# estimate variable importance starting from initial set
+
+modFit <- train(as.numeric(target$classe) ~ ., method="lm", data=numericdata)
+modFit
+
+importance <- varImp(modFit, scale=FALSE)
+# summarize importance
+print(importance)
+# plot importance
+plot(importance)
+
+# I now take the first 12, since there apears to be a significant cut there
+
+finaldata <- subset(traindata, select=c("classe", "magnet_dumbbell_z", "accel_forearm_z","magnet_dumbbell_x","pitch_forearm","yaw_dumbbell","magnet_belt_y","total_accel_forearm","accel_arm_z","accel_belt_y","pitch_belt","accel_dumbbell_x","total_accel_dumbbell"))
+
+# Now, I check the best algorithm for the model.
+#Since the testing data included does not have a target, I need to slice down the data for training and testing.
+
+inTrain <- createDataPartition(y=target$class, p=0.75, list=FALSE)
+training <- finaldata[inTrain,]
+testing <- finaldata[-inTrain,]
+
+modFitOp1 <- train(as.numeric(classe) ~ ., method="lm", data=training)
+modFitOp1
+
+#tc <- trainControl("repeatedcv", number=10, repeats=10, classProbs=TRUE, savePred=T) 
+#modFitOp2 <- train(as.numeric(classe) ~ ., method="rf", trControl=tc, , data=training, preProc=c("center", "scale"), verbose=TRUE)
+
+modFitOp2 <- train(as.numeric(classe) ~ ., method="nnet", data=training, verbose =TRUE)
+
+modFitOp2
+
+modFitOp3 <- train(as.numeric(classe) ~ ., method="gbm", data=training)
+modFitOp3
+
+plot(testing$classe, pred1)
+plot(testing$classe, pred2)
+plot(testing$classe, pred3)
+
+predicted1 <- predict(modFitOp1, training)
+divide1 = cut(predicted1,5)
+levels(divide1)[1] <- "A"
+levels(divide1)[2] <- "B"
+levels(divide1)[3] <- "C"
+levels(divide1)[4] <- "D"
+levels(divide1)[5] <- "E"
+
+confusionMat1 <- confusionMatrix(divide1, training$classe)
+confusionMat1
+
+predicted2 <- predict(modFitOp2, training)
+divide2 = cut(predicted2,5)
+levels(divide2)[1] <- "A"
+levels(divide2)[2] <- "B"
+levels(divide2)[3] <- "C"
+levels(divide2)[4] <- "D"
+levels(divide2)[5] <- "E"
+
+confusionMat2 <- confusionMatrix(divide2, training$classe)
+confusionMat2
+
+predicted3 <- predict(modFitOp3, training)
+divide3 = cut(predicted3,5)
+levels(divide3)[1] <- "A"
+levels(divide3)[2] <- "B"
+levels(divide3)[3] <- "C"
+levels(divide3)[4] <- "D"
+levels(divide3)[5] <- "E"
+
+confusionMat3 <- confusionMatrix(divide3, training$classe)
+confusionMat3
+```
